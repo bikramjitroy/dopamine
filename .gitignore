@@ -6,4 +6,6 @@ dopamine/agents/rainbow/__pycache__/*
 dopamine/discrete_domains/__pycache__/*
 dopamine/replay_memory/__pycache__/*
 dopamine/osim_domains/__pycache__/*
-
+.vscode/*
+err.log
+out.log
