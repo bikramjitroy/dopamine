@@ -1,0 +1,35 @@
+# Hyperparameters for a simple DQN-style Acrobot agent. The hyperparameters
+# chosen achieve reasonable performance.
+import dopamine.discrete_domains.osim_lib
+import dopamine.discrete_domains.run_experiment
+import dopamine.agents.dqn.dqn_agent
+import dopamine.replay_memory.circular_replay_buffer
+import gin.tf.external_configurables
+
+DQNAgent.observation_shape = %osim_lib.OSIM_DQN_OBSERVATION_SHAPE
+DQNAgent.observation_dtype = %osim_lib.OSIM_DQN_OBSERVATION_DTYPE
+DQNAgent.stack_size = %osim_lib.OSIM_DQN_STACK_SIZE
+DQNAgent.network = @osim_lib.nature_dqn_network
+DQNAgent.gamma = 0.99
+DQNAgent.update_horizon = 1
+DQNAgent.min_replay_history = 20000
+DQNAgent.update_period = 4
+DQNAgent.target_update_period = 100
+#DQNAgent.epsilon_fn = @dqn_agent_opensim.identity_epsilon
+DQNAgent.tf_device = '/gpu:0'  # use '/cpu:*' for non-GPU version
+DQNAgent.optimizer = @tf.train.AdamOptimizer()
+
+tf.train.AdamOptimizer.learning_rate = 0.001
+tf.train.AdamOptimizer.epsilon = 0.0003125
+
+create_agent.agent_name = 'dqn'
+Runner.create_environment_fn = @osim_lib.create_opensim_environment
+Runner.num_iterations = 1000
+Runner.training_steps = 1000
+Runner.evaluation_steps = 1000
+Runner.max_steps_per_episode = 1000
+
+TrainRunner.create_environment_fn=@osim_lib.create_opensim_environment
+
+WrappedReplayBuffer.replay_capacity = 50000
+WrappedReplayBuffer.batch_size = 128
