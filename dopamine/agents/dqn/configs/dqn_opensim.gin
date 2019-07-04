@@ -14,8 +14,10 @@ DQNAgent.gamma = 0.99
 DQNAgent.update_horizon = 1
 DQNAgent.min_replay_history = 20000
 DQNAgent.update_period = 4
-DQNAgent.target_update_period = 100
-#DQNAgent.epsilon_fn = @dqn_agent_opensim.identity_epsilon
+DQNAgent.target_update_period = 5000
+DQNAgent.epsilon_train = 0.1
+DQNAgent.epsilon_eval = 0.05
+DQNAgent.epsilon_decay_period = 100000  # agent steps
 DQNAgent.tf_device = '/gpu:0'  # use '/cpu:*' for non-GPU version
 DQNAgent.optimizer = @tf.train.AdamOptimizer()
 
@@ -24,12 +26,12 @@ tf.train.AdamOptimizer.epsilon = 0.0003125
 
 create_agent.agent_name = 'dqn'
 Runner.create_environment_fn = @osim_lib.create_opensim_environment
-Runner.num_iterations = 1000
-Runner.training_steps = 1000
+Runner.num_iterations = 500
+Runner.training_steps = 100000
 Runner.evaluation_steps = 1000
 Runner.max_steps_per_episode = 1000
 
 TrainRunner.create_environment_fn=@osim_lib.create_opensim_environment
 
-WrappedReplayBuffer.replay_capacity = 50000
-WrappedReplayBuffer.batch_size = 128
+WrappedReplayBuffer.replay_capacity = 100000
+WrappedReplayBuffer.batch_size = 32

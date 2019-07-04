@@ -268,7 +268,13 @@ class OpensimPreprocessing(object):
     -8.041966456860847323e-01, # knee extend
     -1.745329251994329478e-01]) # ankle flex
 
+    sim_dt = 0.01
+    sim_t = 10
+    timstep_limit = int(round(sim_t/sim_dt))
+
+
     obs_dict = self.environment.reset(project=True, seed=None, obs_as_dict=False, init_pose=INIT_POSE)
+    self.environment.spec.timestep_limit = timstep_limit
     return np.array(obs_dict)
     #return self._pool_and_resize()
 
@@ -307,12 +313,13 @@ class OpensimPreprocessing(object):
       if done:
         break
       # We max-pool over the last two observation.
-      elif time_step >= self.frame_skip - 2:
-        t = time_step - (self.frame_skip - 2)
-        #self._fetch_grayscale_observation(self.screen_buffer[t])
+      #elif time_step >= self.frame_skip - 2:
+      #  t = time_step - (self.frame_skip - 2)
+      #  self._fetch_grayscale_observation(self.screen_buffer[t])
 
     # Pool the last two observations.
     #observation = self._pool_and_resize()
+    
     observation = np.array(obs_dict)
 
     self.game_over = done
