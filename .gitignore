@@ -9,3 +9,10 @@ dopamine/osim_domains/__pycache__/*
 .vscode/*
 err.log
 out.log
+dopamine/__init__.pyc
+dopamine/agents/__init__.pyc
+dopamine/agents/dqn/__init__.pyc
+dopamine/agents/dqn/dqn_agent.pyc
+dopamine/discrete_domains/__init__.pyc
+dopamine/discrete_domains/atari_lib.pyc
+dopamine/discrete_domains/run_experiment.pyc

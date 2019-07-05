@@ -42,10 +42,10 @@ slim = tf.contrib.slim
 
 OSIM_DQN_OBSERVATION_SHAPE = (290,)  # Size of observation space
 OSIM_DQN_OBSERVATION_DTYPE = tf.float32  # value of.
-OSIM_DQN_STACK_SIZE = 3  # Number of frames in the state stack.
+OSIM_DQN_STACK_SIZE = 4  # Number of frames in the state stack.
 gin.constant('osim_lib.OSIM_DQN_OBSERVATION_SHAPE', (290,))
 gin.constant('osim_lib.OSIM_DQN_OBSERVATION_DTYPE', tf.float32)
-gin.constant('osim_lib.OSIM_DQN_STACK_SIZE', 3)
+gin.constant('osim_lib.OSIM_DQN_STACK_SIZE', 4)
 
 
 @gin.configurable
@@ -76,52 +76,46 @@ def nature_dqn_network(num_actions, network_type, state):
   weights_initializer = slim.variance_scaling_initializer(
       factor=1.0 / np.sqrt(3.0), mode='FAN_IN', uniform=True)
 
-
   all_net = tf.cast(state, tf.float32)
   batch_size = all_net.get_shape().as_list()[0]
   stack_size = all_net.get_shape().as_list()[2]
 
-
   velocity_net = tf.slice(all_net, [0,0,0], [batch_size,242,stack_size])
-  velocity_net = tf.reshape(velocity_net, [batch_size, 2, 121, stack_size])
+  velocity_net = tf.reshape(velocity_net, [batch_size, 2, 11, 11, stack_size])
 
-  velocity_net = slim.conv2d(
-      velocity_net, 32, [4, 4], stride=2, weights_initializer=weights_initializer)
-  velocity_net = slim.conv2d(
-      velocity_net, 32, [4, 4], stride=2, weights_initializer=weights_initializer)      
-  velocity_net = slim.conv2d(
-      velocity_net, 32, [3, 3], stride=2, weights_initializer=weights_initializer)     
+  velocity_net = slim.conv3d(
+      velocity_net, 32, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)
+  velocity_net = slim.conv3d(
+      velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)      
+  velocity_net = slim.conv3d(
+      velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)     
   velocity_net = slim.flatten(velocity_net)
   velocity_net = slim.fully_connected(velocity_net, 64, activation_fn=tf.nn.relu6)
   velocity_net = slim.fully_connected(velocity_net, 16, activation_fn=tf.nn.relu6)
-
-
-
 
   pelvis_net = tf.slice(all_net, [0,242,0], [batch_size,4,stack_size])
   pelvis_net = slim.flatten(pelvis_net)
   pelvis_net = slim.fully_connected(velocity_net, 4, activation_fn=tf.nn.relu6)
 
-  
   l_leg = tf.slice(all_net, [0,246,0], [batch_size,22,stack_size])
   l_leg = slim.fully_connected(l_leg, 16, activation_fn=tf.nn.relu6)
   l_leg = slim.flatten(l_leg)
   l_leg = slim.fully_connected(l_leg, 8, activation_fn=tf.nn.relu6)
-
-
 
   r_leg = tf.slice(all_net, [0,268,0], [batch_size,22,stack_size])
   r_leg = slim.fully_connected(r_leg, 16, activation_fn=tf.nn.relu6)
   r_leg = slim.flatten(r_leg)
   r_leg = slim.fully_connected(r_leg, 8, activation_fn=tf.nn.relu6)
 
-  concat = tf.concat([velocity_net, pelvis_net], 1)
-  concat =  tf.concat([concat, l_leg], 1)
-  concat =  tf.concat([concat, r_leg], 1)
+  body_net =  tf.concat([pelvis_net, l_leg], 1)
+  body_net =  tf.concat([body_net, r_leg], 1)
+  body_net = slim.flatten(body_net)
+  body_net = slim.fully_connected(body_net, 64)
 
-  net = slim.flatten(concat)
-  net = slim.fully_connected(net, 256)
+  net = tf.concat([pelvis_net, body_net], 1)
   net = slim.fully_connected(net, 128)
+  net = slim.fully_connected(net, 64)
+
   q_values = slim.fully_connected(net, num_actions, activation_fn=tf.nn.relu)
   return network_type(q_values)
 
