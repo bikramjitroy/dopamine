@@ -40,12 +40,12 @@ from osim.env import L2M2019Env
 slim = tf.contrib.slim
 
 
-OSIM_DQN_OBSERVATION_SHAPE = (339,)  # Size of observation space
+OSIM_DQN_OBSERVATION_SHAPE = (290,)  # Size of observation space
 OSIM_DQN_OBSERVATION_DTYPE = tf.float32  # value of.
-OSIM_DQN_STACK_SIZE = 4  # Number of frames in the state stack.
-gin.constant('osim_lib.OSIM_DQN_OBSERVATION_SHAPE', (339,))
+OSIM_DQN_STACK_SIZE = 3  # Number of frames in the state stack.
+gin.constant('osim_lib.OSIM_DQN_OBSERVATION_SHAPE', (290,))
 gin.constant('osim_lib.OSIM_DQN_OBSERVATION_DTYPE', tf.float32)
-gin.constant('osim_lib.OSIM_DQN_STACK_SIZE', 4)
+gin.constant('osim_lib.OSIM_DQN_STACK_SIZE', 3)
 
 
 @gin.configurable
@@ -72,11 +72,57 @@ def nature_dqn_network(num_actions, network_type, state):
   Returns:
     net: _network_type object containing the tensors output by the network.
   """
-  net = tf.cast(state, tf.float32)
-  net = slim.flatten(net)
-  net = slim.fully_connected(net, 512)
-  net = slim.fully_connected(net, 512)
-  q_values = slim.fully_connected(net, num_actions, activation_fn=tf.nn.sigmoid)
+
+  weights_initializer = slim.variance_scaling_initializer(
+      factor=1.0 / np.sqrt(3.0), mode='FAN_IN', uniform=True)
+
+
+  all_net = tf.cast(state, tf.float32)
+  batch_size = all_net.get_shape().as_list()[0]
+  stack_size = all_net.get_shape().as_list()[2]
+
+
+  velocity_net = tf.slice(all_net, [0,0,0], [batch_size,242,stack_size])
+  velocity_net = tf.reshape(velocity_net, [batch_size, 2, 121, stack_size])
+
+  velocity_net = slim.conv2d(
+      velocity_net, 32, [4, 4], stride=2, weights_initializer=weights_initializer)
+  velocity_net = slim.conv2d(
+      velocity_net, 32, [4, 4], stride=2, weights_initializer=weights_initializer)      
+  velocity_net = slim.conv2d(
+      velocity_net, 32, [3, 3], stride=2, weights_initializer=weights_initializer)     
+  velocity_net = slim.flatten(velocity_net)
+  velocity_net = slim.fully_connected(velocity_net, 64, activation_fn=tf.nn.relu6)
+  velocity_net = slim.fully_connected(velocity_net, 16, activation_fn=tf.nn.relu6)
+
+
+
+
+  pelvis_net = tf.slice(all_net, [0,242,0], [batch_size,4,stack_size])
+  pelvis_net = slim.flatten(pelvis_net)
+  pelvis_net = slim.fully_connected(velocity_net, 4, activation_fn=tf.nn.relu6)
+
+  
+  l_leg = tf.slice(all_net, [0,246,0], [batch_size,22,stack_size])
+  l_leg = slim.fully_connected(l_leg, 16, activation_fn=tf.nn.relu6)
+  l_leg = slim.flatten(l_leg)
+  l_leg = slim.fully_connected(l_leg, 8, activation_fn=tf.nn.relu6)
+
+
+
+  r_leg = tf.slice(all_net, [0,268,0], [batch_size,22,stack_size])
+  r_leg = slim.fully_connected(r_leg, 16, activation_fn=tf.nn.relu6)
+  r_leg = slim.flatten(r_leg)
+  r_leg = slim.fully_connected(r_leg, 8, activation_fn=tf.nn.relu6)
+
+  concat = tf.concat([velocity_net, pelvis_net], 1)
+  concat =  tf.concat([concat, l_leg], 1)
+  concat =  tf.concat([concat, r_leg], 1)
+
+  net = slim.flatten(concat)
+  net = slim.fully_connected(net, 256)
+  net = slim.fully_connected(net, 128)
+  q_values = slim.fully_connected(net, num_actions, activation_fn=tf.nn.relu)
   return network_type(q_values)
 
 @gin.configurable
@@ -192,7 +238,7 @@ class OpensimPreprocessing(object):
   Evaluation Protocols and Open Problems for General Agents".
   """
 
-  def __init__(self, environment, frame_skip=4):
+  def __init__(self, environment, frame_skip=2):
     """Constructor for an Atari 2600 preprocessor.
 
     Args:
@@ -212,17 +258,17 @@ class OpensimPreprocessing(object):
     self.environment = environment
     self.frame_skip = frame_skip
 
-    obs_dims = self.environment.observation_space
+    #obs_dims = self.environment.observation_space
 
 
-    print("BIKS: obs_dims", obs_dims)
+    #print("BIKS: obs_dims", obs_dims)
 
     # Stores temporary observations used for pooling over two successive
     # frames.
-    self.obs_buffer = [
-        np.empty((obs_dims.shape[0]), dtype=np.float32),
-        np.empty((obs_dims.shape[0]), dtype=np.float32)
-    ]
+    #self.obs_buffer = [
+    #    np.empty((obs_dims.shape[0]), dtype=np.float32),
+    #    np.empty((obs_dims.shape[0]), dtype=np.float32)
+    #]
 
     self.game_over = False
 
@@ -230,7 +276,7 @@ class OpensimPreprocessing(object):
   def observation_space(self):
     # Return the observation space adjusted to match the shape of the processed
     # observations.
-    return Box(low=0.0, high=1.0, shape=(339,), dtype=np.float32)
+    return Box(low=0.0, high=1.0, shape=OSIM_DQN_OBSERVATION_SHAPE, dtype=np.float32)
 
   @property
   def action_space(self):
@@ -273,10 +319,44 @@ class OpensimPreprocessing(object):
     timstep_limit = int(round(sim_t/sim_dt))
 
 
-    obs_dict = self.environment.reset(project=True, seed=None, obs_as_dict=False, init_pose=INIT_POSE)
+    obs_dict = self.environment.reset(project=True, seed=None, obs_as_dict=True, init_pose=INIT_POSE)
     self.environment.spec.timestep_limit = timstep_limit
-    return np.array(obs_dict)
+    return np.array(self._obs_dict_to_arr(obs_dict))
     #return self._pool_and_resize()
+
+  def _obs_dict_to_arr(self, obs_dict):
+          # Augmented environment from the L2R challenge
+    res = []
+
+    # target velocity field (in body frame)
+    v_tgt = np.ndarray.flatten(obs_dict['v_tgt_field'])
+    res += v_tgt.tolist()
+
+    res.append(obs_dict['pelvis']['height'])
+    #res.append(obs_dict['pelvis']['pitch'])
+    #res.append(obs_dict['pelvis']['roll'])
+    res.append(obs_dict['pelvis']['vel'][0]/self.environment.LENGTH0)
+    res.append(obs_dict['pelvis']['vel'][1]/self.environment.LENGTH0)
+    res.append(obs_dict['pelvis']['vel'][2]/self.environment.LENGTH0)
+    #res.append(obs_dict['pelvis']['vel'][3])
+    #res.append(obs_dict['pelvis']['vel'][4])
+    #res.append(obs_dict['pelvis']['vel'][5])
+
+    for leg in ['r_leg', 'l_leg']:
+            res += obs_dict[leg]['ground_reaction_forces']
+            res.append(obs_dict[leg]['joint']['hip_abd'])
+            res.append(obs_dict[leg]['joint']['hip'])
+            res.append(obs_dict[leg]['joint']['knee'])
+            res.append(obs_dict[leg]['joint']['ankle'])
+            res.append(obs_dict[leg]['d_joint']['hip_abd'])
+            res.append(obs_dict[leg]['d_joint']['hip'])
+            res.append(obs_dict[leg]['d_joint']['knee'])
+            res.append(obs_dict[leg]['d_joint']['ankle'])
+            for MUS in ['HAB', 'HAD', 'HFL', 'GLU', 'HAM', 'RF', 'VAS', 'BFSH', 'GAS', 'SOL', 'TA']:
+                res.append(obs_dict[leg][MUS]['f'])
+                #res.append(obs_dict[leg][MUS]['l'])
+                #res.append(obs_dict[leg][MUS]['v'])
+    return res
 
   def render(self, mode):
     """Renders the current screen, before preprocessing.
@@ -298,6 +378,11 @@ class OpensimPreprocessing(object):
   def step(self, action):
     accumulated_reward = 0.0
 
+
+    #Sticky Action while skipping observation
+    specifix_action = np.zeros(self.environment.action_space.n, dtype=np.float32)
+    specifix_action[action] = 1.0
+
     for time_step in range(self.frame_skip):
       # We bypass the Gym observation altogether and directly fetch the
       # grayscale image from the ALE. This is a little faster.
@@ -305,9 +390,8 @@ class OpensimPreprocessing(object):
 
       #print('BIKS: ACTION: ', action)
 
-      specifix_action = np.zeros(22)
-      specifix_action[action] = 1.0
-      obs_dict, reward, done, info = self.environment.step(specifix_action, project = True, obs_as_dict=False)
+
+      obs_dict, reward, done, info = self.environment.step(specifix_action, project = True, obs_as_dict=True)
       accumulated_reward += reward
 
       if done:
@@ -320,7 +404,7 @@ class OpensimPreprocessing(object):
     # Pool the last two observations.
     #observation = self._pool_and_resize()
     
-    observation = np.array(obs_dict)
+    observation = np.array(self._obs_dict_to_arr(obs_dict))
 
     self.game_over = done
     return observation, accumulated_reward, done, info
