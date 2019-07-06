@@ -133,20 +133,51 @@ def rainbow_network(num_actions, num_atoms, support, network_type, state):
   Returns:
     net: _network_type object containing the tensors output by the network.
   """
+
   weights_initializer = slim.variance_scaling_initializer(
       factor=1.0 / np.sqrt(3.0), mode='FAN_IN', uniform=True)
 
-  net = tf.cast(state, tf.float32)
-  net = tf.div(net, 255.)
-  net = slim.conv2d(
-      net, 32, [8, 8], stride=4, weights_initializer=weights_initializer)
-  net = slim.conv2d(
-      net, 64, [4, 4], stride=2, weights_initializer=weights_initializer)
-  net = slim.conv2d(
-      net, 64, [3, 3], stride=1, weights_initializer=weights_initializer)
-  net = slim.flatten(net)
-  net = slim.fully_connected(
-      net, 512, weights_initializer=weights_initializer)
+  all_net = tf.cast(state, tf.float32)
+  batch_size = all_net.get_shape().as_list()[0]
+  stack_size = all_net.get_shape().as_list()[2]
+
+  velocity_net = tf.slice(all_net, [0,0,0], [batch_size,242,stack_size])
+  velocity_net = tf.reshape(velocity_net, [batch_size, 2, 11, 11, stack_size])
+
+  velocity_net = slim.conv3d(
+      velocity_net, 32, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)
+  velocity_net = slim.conv3d(
+      velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)      
+  velocity_net = slim.conv3d(
+      velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)     
+  velocity_net = slim.flatten(velocity_net)
+  velocity_net = slim.fully_connected(velocity_net, 64, activation_fn=tf.nn.relu6)
+  velocity_net = slim.fully_connected(velocity_net, 16, activation_fn=tf.nn.relu6)
+
+  pelvis_net = tf.slice(all_net, [0,242,0], [batch_size,4,stack_size])
+  pelvis_net = slim.flatten(pelvis_net)
+  pelvis_net = slim.fully_connected(velocity_net, 4, activation_fn=tf.nn.relu6)
+
+  l_leg = tf.slice(all_net, [0,246,0], [batch_size,22,stack_size])
+  l_leg = slim.fully_connected(l_leg, 16, activation_fn=tf.nn.relu6)
+  l_leg = slim.flatten(l_leg)
+  l_leg = slim.fully_connected(l_leg, 8, activation_fn=tf.nn.relu6)
+
+  r_leg = tf.slice(all_net, [0,268,0], [batch_size,22,stack_size])
+  r_leg = slim.fully_connected(r_leg, 16, activation_fn=tf.nn.relu6)
+  r_leg = slim.flatten(r_leg)
+  r_leg = slim.fully_connected(r_leg, 8, activation_fn=tf.nn.relu6)
+
+  body_net =  tf.concat([pelvis_net, l_leg], 1)
+  body_net =  tf.concat([body_net, r_leg], 1)
+  body_net = slim.flatten(body_net)
+  body_net = slim.fully_connected(body_net, 64)
+
+  net = tf.concat([pelvis_net, body_net], 1)
+  net = slim.fully_connected(net, 128)
+  net = slim.fully_connected(net, 64)
+
+
   net = slim.fully_connected(
       net,
       num_actions * num_atoms,
@@ -173,21 +204,54 @@ def implicit_quantile_network(num_actions, quantile_embedding_dim,
   Returns:
     net: _network_type object containing the tensors output by the network.
   """
+
   weights_initializer = slim.variance_scaling_initializer(
       factor=1.0 / np.sqrt(3.0), mode='FAN_IN', uniform=True)
 
-  state_net = tf.cast(state, tf.float32)
-  state_net = tf.div(state_net, 255.)
-  state_net = slim.conv2d(
-      state_net, 32, [8, 8], stride=4,
-      weights_initializer=weights_initializer)
-  state_net = slim.conv2d(
-      state_net, 64, [4, 4], stride=2,
-      weights_initializer=weights_initializer)
-  state_net = slim.conv2d(
-      state_net, 64, [3, 3], stride=1,
-      weights_initializer=weights_initializer)
-  state_net = slim.flatten(state_net)
+  all_net = tf.cast(state, tf.float32)
+  batch_size = all_net.get_shape().as_list()[0]
+  stack_size = all_net.get_shape().as_list()[2]
+
+  velocity_net = tf.slice(all_net, [0,0,0], [batch_size,242,stack_size])
+  velocity_net = tf.reshape(velocity_net, [batch_size, 2, 11, 11, stack_size])
+
+  velocity_net = slim.conv3d(
+      velocity_net, 32, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)
+  velocity_net = slim.conv3d(
+      velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)      
+  velocity_net = slim.conv3d(
+      velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)     
+  velocity_net = slim.flatten(velocity_net)
+  velocity_net = slim.fully_connected(velocity_net, 64, activation_fn=tf.nn.relu6)
+  velocity_net = slim.fully_connected(velocity_net, 16, activation_fn=tf.nn.relu6)
+
+  pelvis_net = tf.slice(all_net, [0,242,0], [batch_size,4,stack_size])
+  pelvis_net = slim.flatten(pelvis_net)
+  pelvis_net = slim.fully_connected(velocity_net, 4, activation_fn=tf.nn.relu6)
+
+  l_leg = tf.slice(all_net, [0,246,0], [batch_size,22,stack_size])
+  l_leg = slim.fully_connected(l_leg, 16, activation_fn=tf.nn.relu6)
+  l_leg = slim.flatten(l_leg)
+  l_leg = slim.fully_connected(l_leg, 8, activation_fn=tf.nn.relu6)
+
+  r_leg = tf.slice(all_net, [0,268,0], [batch_size,22,stack_size])
+  r_leg = slim.fully_connected(r_leg, 16, activation_fn=tf.nn.relu6)
+  r_leg = slim.flatten(r_leg)
+  r_leg = slim.fully_connected(r_leg, 8, activation_fn=tf.nn.relu6)
+
+  body_net =  tf.concat([pelvis_net, l_leg], 1)
+  body_net =  tf.concat([body_net, r_leg], 1)
+  body_net = slim.flatten(body_net)
+  body_net = slim.fully_connected(body_net, 64)
+
+  net = tf.concat([pelvis_net, body_net], 1)
+  net = slim.fully_connected(net, 128)
+  state_net = slim.fully_connected(net, 64)
+
+
+
+
+
   state_net_size = state_net.get_shape().as_list()[-1]
   state_net_tiled = tf.tile(state_net, [num_quantiles, 1])
 
