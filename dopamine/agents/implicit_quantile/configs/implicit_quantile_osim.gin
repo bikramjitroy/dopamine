@@ -1,0 +1,50 @@
+# Hyperparameters follow Dabney et al. (2018), but we modify as necessary to
+# match those used in Rainbow (Hessel et al., 2018), to ensure apples-to-apples
+# comparison.
+import dopamine.agents.implicit_quantile.implicit_quantile_agent
+import dopamine.agents.rainbow.rainbow_agent
+import dopamine.discrete_domains.osim_lib
+import dopamine.discrete_domains.run_experiment
+import dopamine.replay_memory.prioritized_replay_buffer
+import gin.tf.external_configurables
+
+ImplicitQuantileAgent.kappa = 1.0
+ImplicitQuantileAgent.num_tau_samples = 64
+ImplicitQuantileAgent.num_tau_prime_samples = 64
+ImplicitQuantileAgent.num_quantile_samples = 32
+ImplicitQuantileAgent.network = @osim_lib.implicit_quantile_network
+
+
+RainbowAgent.observation_shape =  %osim_lib.OSIM_DQN_OBSERVATION_SHAPE
+RainbowAgent.observation_dtype =  %osim_lib.OSIM_DQN_OBSERVATION_DTYPE
+RainbowAgent.stack_size =  %osim_lib.OSIM_DQN_STACK_SIZE
+RainbowAgent.network = @osim_lib.implicit_quantile_network
+
+RainbowAgent.gamma = 0.99
+RainbowAgent.update_horizon = 3
+RainbowAgent.min_replay_history = 2000 # agent steps
+RainbowAgent.update_period = 4
+RainbowAgent.target_update_period = 500 # agent steps
+RainbowAgent.epsilon_train = 0.01
+RainbowAgent.epsilon_eval = 0.001
+RainbowAgent.epsilon_decay_period = 2500  # agent steps
+# IQN currently does not support prioritized replay.
+RainbowAgent.replay_scheme = 'uniform'
+RainbowAgent.tf_device = '/gpu:0'  # '/cpu:*' use for non-GPU version
+RainbowAgent.optimizer = @tf.train.AdamOptimizer()
+
+tf.train.AdamOptimizer.learning_rate = 0.00005
+tf.train.AdamOptimizer.epsilon = 0.0003125
+
+create_agent.agent_name = 'implicit_quantile'
+Runner.create_environment_fn =  @osim_lib.create_opensim_environment
+Runner.num_iterations = 500
+Runner.training_steps = 2500
+Runner.evaluation_steps = 500
+Runner.max_steps_per_episode = 500
+
+WrappedPrioritizedReplayBuffer.replay_capacity = 5000
+WrappedPrioritizedReplayBuffer.batch_size = 128
+
+TrainRunner.create_environment_fn=@osim_lib.create_opensim_environment
+
