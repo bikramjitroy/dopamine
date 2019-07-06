@@ -186,7 +186,7 @@ def rainbow_network(num_actions, num_atoms, support, network_type, state):
   q_values = tf.reduce_sum(support * probabilities, axis=2)
   return network_type(q_values, logits, probabilities)
 
-
+@gin.configurable
 def implicit_quantile_network(num_actions, quantile_embedding_dim,
                               network_type, state, num_quantiles):
   """The Implicit Quantile ConvNet.
