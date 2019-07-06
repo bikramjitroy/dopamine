@@ -151,8 +151,7 @@ def rainbow_network(num_actions, num_atoms, support, network_type, state):
   velocity_net = slim.conv3d(
       velocity_net, 64, [1, 3, 3], stride=(1,2,2), weights_initializer=weights_initializer)     
   velocity_net = slim.flatten(velocity_net)
-  velocity_net = slim.fully_connected(velocity_net, 64, activation_fn=tf.nn.relu6)
-  velocity_net = slim.fully_connected(velocity_net, 16, activation_fn=tf.nn.relu6)
+  velocity_net = slim.fully_connected(velocity_net, 32, activation_fn=tf.nn.relu6)
 
   pelvis_net = tf.slice(all_net, [0,242,0], [batch_size,4,stack_size])
   pelvis_net = slim.flatten(pelvis_net)
@@ -171,12 +170,10 @@ def rainbow_network(num_actions, num_atoms, support, network_type, state):
   body_net =  tf.concat([pelvis_net, l_leg], 1)
   body_net =  tf.concat([body_net, r_leg], 1)
   body_net = slim.flatten(body_net)
-  body_net = slim.fully_connected(body_net, 64)
+  body_net = slim.fully_connected(body_net, 32)
 
   net = tf.concat([pelvis_net, body_net], 1)
-  net = slim.fully_connected(net, 128)
-  net = slim.fully_connected(net, 64)
-
+  net = slim.fully_connected(net, 32)
 
   net = slim.fully_connected(
       net,
