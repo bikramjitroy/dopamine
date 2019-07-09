@@ -1,0 +1,19 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "module": "dopamine.discrete_domains.train",
+            "console": "integratedTerminal",
+            "args": [
+                "--base_dir=/home/bikram/Prosthetics/osim_agent/dopamine-dqn-test-checkpoint",
+                "--gin_files='dqn_osim.gin'"
+            ]
+        }
+    ]
+}
